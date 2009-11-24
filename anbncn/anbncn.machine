@@ -1,0 +1,26 @@
+# Recognize if the input is exactly the concatenation of n 'a' symbols, n 'b' symbols, and n 'c' symbols, for some n.
+SYMBOL a
+SYMBOL b
+SYMBOL c
+SYMBOL d
+SYMBOL *
+TRANSITION 1 a d r 2
+TRANSITION 1 b b h 1 No
+TRANSITION 1 c c h 1 No
+TRANSITION 1 d d r 1
+TRANSITION 1 * * h 1 Yes
+TRANSITION 2 a a r 2
+TRANSITION 2 b d r 3
+TRANSITION 2 c c h 2 No
+TRANSITION 2 d d r 2
+TRANSITION 2 * * h 2 No
+TRANSITION 3 a a h 3 No
+TRANSITION 3 b b r 3
+TRANSITION 3 c d l 4
+TRANSITION 3 d d r 3
+TRANSITION 3 * * h 3 No
+TRANSITION 4 a a l 4
+TRANSITION 4 b b l 4
+TRANSITION 4 c c l 4
+TRANSITION 4 d d l 4
+TRANSITION 4 * * r 1

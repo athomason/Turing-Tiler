@@ -1,0 +1,226 @@
+# Write a 1 at positions where the distance from the tape origin as represented in binary has an odd number of bits set to 1, and 0 elsewhere.
+
+# Strategy:
+#
+# The above formula (the sum of the digits of the position number in base 2,
+# modulo 2) generates a pattern that repeats in powers of 4. At iteration n of
+# the pattern with a string of bits s set to 0 or 1, the next iteration n+1 has
+# bits set as sSSs, where S is the complement of s. That is, starting from a
+# pattern of 0, the next pattern is 0110, and the next is 0110100110010110 ad
+# infinitum. With n=0 corresponding to the seed tape with one bit set to 0,
+# after each subsequent iteration 4^n bits are written.
+#
+# To generate this pattern mechanically, then, we seed the tape with a 0 and
+# proceed through the iterations, making three copies of the previous state,
+# with two complemented and one not (SSs to the prior iteration's s). Copies
+# can be made in reverse since the pattern is symmetrical between origin and
+# any index which is a power of 4.
+
+SYMBOL _ # blank; empty space where output 0 or 1 will be written
+SYMBOL 0 # unset bit
+SYMBOL 1 # set bit
+SYMBOL a # unset bit with 'X' marker
+SYMBOL b # set bit with 'X' marker
+SYMBOL c # unset bit with 'Y' marker
+SYMBOL d # set bit with 'Y' marker
+SYMBOL e # unset bit with 'X' and 'Y' markers
+SYMBOL f # set bit with 'X' and 'Y' markers
+SYMBOL * # end of tape on left or right
+
+# Pseudocode:
+#
+#   Pass 0: scan right to last, mark a X/Y
+#   Passes 1-3:
+#    Read digit, scan right to blank and write inverse (1,2) or same (3)
+#    Scan left to X, remove it, move left
+#      If a digit, write an X, redo
+#      If EOT, scan right to Y, move left, goto next pass
+#   Pass 4: 
+#    Erase Y, goto pass 0
+#
+#   NB: Transitions between passes can be optimized such that the last state of
+#   one passes reads the digit necessary for the start of the next
+#
+# Perl:
+#
+#   my @t = qw/0/;
+#   while (1) {
+#       my $last = @t-1;
+#       for (my $n = $last; $n >=0; $n--) {
+#           push @t, 1-$t[$n];
+#       }
+#       for (my $n = $last; $n >=0; $n--) {
+#           push @t, 1-$t[$n];
+#       }
+#       for (my $n = $last; $n >=0; $n--) {
+#           push @t,   $t[$n];
+#       }
+#   }
+
+START I1
+
+# init: write a 0 if nothing already on tape
+TRANSITION I1 _ 0 r I2
+TRANSITION I1 0 0 r I2
+TRANSITION I1 1 1 r I2
+
+# PASS 0: scan right to last, mark a X/Y
+
+# scan right to blank or EOT
+TRANSITION I2 0 0 r I2
+TRANSITION I2 1 1 r I2
+# back up to last written cell
+TRANSITION I2 _ _ l I3
+TRANSITION I2 * * l I3
+
+# mark X/Y
+TRANSITION I3 0 e r A1
+TRANSITION I3 1 f r A2
+
+# PASS 1
+#  Read digit, scan right to blank and write inverse
+#  Scan left to X, remove it, move left
+#    If a digit, write an X, redo
+#    If EOT, scan right to Y, write X, goto next pass
+
+# (read a 0) scan right to blank
+TRANSITION A1 0 0 r A1
+TRANSITION A1 1 1 r A1
+TRANSITION A1 c c r A1
+TRANSITION A1 d d r A1
+TRANSITION A1 _ 1 l A3 # write inverse
+TRANSITION A1 * * l ER
+
+# (read a 1) scan right to blank
+TRANSITION A2 0 0 r A2
+TRANSITION A2 1 1 r A2
+TRANSITION A2 c c r A2
+TRANSITION A2 d d r A2
+TRANSITION A2 _ 0 l A3 # write inverse
+TRANSITION A2 * * l ER
+
+# Scan left to X, remove it, move left
+# scan left
+TRANSITION A3 0 0 l A3
+TRANSITION A3 1 1 l A3
+TRANSITION A3 c c l A3
+TRANSITION A3 d d l A3
+# remove it, move left
+TRANSITION A3 a 0 l A4
+TRANSITION A3 b 1 l A4
+TRANSITION A3 e c l A4
+TRANSITION A3 f d l A4
+
+# If a digit, write an X, redo
+TRANSITION A4 0 a r A1
+TRANSITION A4 1 b r A2
+TRANSITION A4 * * r A5
+
+# If EOT, scan right to Y, write X, goto next pass
+TRANSITION A5 0 0 r A5
+TRANSITION A5 1 1 r A5
+TRANSITION A5 c e r B1
+TRANSITION A5 d f r B2
+
+# PASS 2
+#  Read digit, scan right to blank and write inverse
+#  Scan left to X, remove it, move left
+#    If a digit, write an X, redo
+#    If EOT, scan right to Y, write X, goto next pass
+
+# (read a 0) scan right to blank
+TRANSITION B1 0 0 r B1
+TRANSITION B1 1 1 r B1
+TRANSITION B1 c c r B1
+TRANSITION B1 d d r B1
+TRANSITION B1 _ 1 l B3 # write inverse
+TRANSITION B1 * * l ER
+
+# (read a 1) scan right to blank
+TRANSITION B2 0 0 r B2
+TRANSITION B2 1 1 r B2
+TRANSITION B2 c c r B2
+TRANSITION B2 d d r B2
+TRANSITION B2 _ 0 l B3 # write inverse
+TRANSITION B2 * * l ER
+
+# Scan left to X, remove it, move left
+# scan left
+TRANSITION B3 0 0 l B3
+TRANSITION B3 1 1 l B3
+TRANSITION B3 c c l B3
+TRANSITION B3 d d l B3
+# remove it, move left
+TRANSITION B3 a 0 l B4
+TRANSITION B3 b 1 l B4
+TRANSITION B3 e c l B4
+TRANSITION B3 f d l B4
+
+# If a digit, write an X, redo
+TRANSITION B4 0 a r B1
+TRANSITION B4 1 b r B2
+TRANSITION B4 * * r B5
+
+# If EOT, scan right to Y, write X, goto next pass
+TRANSITION B5 0 0 r B5
+TRANSITION B5 1 1 r B5
+TRANSITION B5 c e r C1
+TRANSITION B5 d f r C2
+
+
+# PASS 3
+#  Read digit, scan right to blank and write same
+#  Scan left to X, remove it, move left
+#    If a digit, write an X, redo
+#    If EOT, scan right to Y, write X, goto next pass
+
+# (read a 0) scan right to blank
+TRANSITION C1 0 0 r C1
+TRANSITION C1 1 1 r C1
+TRANSITION C1 c c r C1
+TRANSITION C1 d d r C1
+TRANSITION C1 _ 0 l C3 # write same
+TRANSITION C1 * * l ER
+
+# (read a 1) scan right to blank
+TRANSITION C2 0 0 r C2
+TRANSITION C2 1 1 r C2
+TRANSITION C2 c c r C2
+TRANSITION C2 d d r C2
+TRANSITION C2 _ 1 l C3 # write same
+TRANSITION C2 * * l ER
+
+# Scan left to X, remove it, move left
+# scan left
+TRANSITION C3 0 0 l C3
+TRANSITION C3 1 1 l C3
+TRANSITION C3 c c l C3
+TRANSITION C3 d d l C3
+# remove it, move left
+TRANSITION C3 a 0 l C4
+TRANSITION C3 b 1 l C4
+TRANSITION C3 e c l C4
+TRANSITION C3 f d l C4
+
+# If a digit, write an X, redo
+TRANSITION C4 0 a r C1
+TRANSITION C4 1 b r C2
+TRANSITION C4 * * r C5
+
+# If EOT, scan right to Y, erase it, goto first pass
+TRANSITION C5 0 0 r C5
+TRANSITION C5 1 1 r C5
+TRANSITION C5 c 0 r I2
+TRANSITION C5 d 1 r I2
+
+# EOT
+
+TRANSITION ER 0 0 l ER
+TRANSITION ER 1 1 l ER
+TRANSITION ER a 0 l ER
+TRANSITION ER b 1 l ER
+TRANSITION ER c 0 l ER
+TRANSITION ER d 1 l ER
+TRANSITION ER e 0 l ER
+TRANSITION ER f 1 l ER
+TRANSITION ER * * h ER Ok

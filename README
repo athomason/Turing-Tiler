@@ -1,0 +1,87 @@
+TURING TILER
+
+This set of scripts generates a two-dimensional tiled representation of the
+running of a Turing machine. The machine runs on a one-dimensional tape with a
+finite alphabet. Each row of the output image represents the state of the
+machine at a successive point in time. By analyzing the machine's description,
+a set of tiles analagous to jigsaw puzzle pieces are created such that the only
+possible piece that may be added to an existing tiling represents the correct
+procedure of the machine. By starting with a seed tile representing the initial
+machine state and proceeding until no additional tiles may be placed, the
+tiling procedure computes the output of the machine.
+
+BUILDING A TURING TILING
+
+1. Create the Turing diagram for the desired machine. The machine has a single
+tape and during each step must:
+    - read one symbol
+    - write a symbol to the same spot
+    - move the head left or right or halt (transitions, not states, specify
+      halting)
+
+2. Convert the diagram into a table. Each transition should be specified as a
+quintet of (initial state, input symbol) -> (output symbol, head movement, end
+state). Legal head movements are left, right, and none (i.e., halt).
+
+3. Produce a machine definition file. This consists of (in order, one statement
+per line):
+
+    - Zero or one NAME statements, e.g. "NAME example". If the name is omitted,
+      it defaults to the filename of the machine definition minus any
+      extension.
+    - One or more SYMBOL statements, e.g. "SYMBOL a". All symbols in the
+      machine's alphabet must be declared.
+    - One STATES statement, e.g. "STATES 4". This declares the number of states
+      in the machine. The states must be numbered sequentially from 1.
+    - One or more TRANSITION statements, e.g. "TRANSITION 1 a d r 2".
+        1) the number of the initial state
+        2) the input symbol to be matched
+        3) the symbol to write to the tape before moving
+        4) the direction to move ('r' for right, 'l' for left, or 'h' for halt)
+        5) the number of the state to move to next
+        6) the final output if the transition specifies halting; this may be
+           any string. This parameter should be omitted if this is not a
+           halting transition.
+
+generate_machine_template.pl can produce a skeleton template with the required
+format.
+
+If any transitions are omitted, the corresponding tiles will not be generated.
+As long as the computation does not encounter those transitions, this causes
+no problem. If the transition IS encountered and the corresponding tile cannot
+be found, the assembly will stall and the computation will fail without output
+(though a tiling reflecting this will still be generated).
+
+4. Verify the machine definition by generating a Turing diagram from the
+definition file using machine2dot.pl. This script produces a file which may be
+processed by dot(1) to create a png, postscript, or other graphic file
+corresponding to the machine definition as interpreted by the program.
+
+5. Generate a tape specification (i.e., initial tape state) using
+make_tape_spec.pl, e.g. "make_tape_spec.pl machine.def aabbcc". This generates
+a tape specification with the same name as the given input string, plus a
+".seed" extension.
+
+6. Assemble the tiling pattern using assemble.pl. The parameters to assemble.pl
+are:
+    - The filename of the machine definition.
+    - The initial input string. The machine head will initial be placed at the
+      first character in the string.
+
+Example:
+
+    ./assembler.pl example.machine abcba
+
+will run the machine defined in example.machine with the input string "abcba".
+The assembler will automatically add bracketing boundary tokens (by default,
+'*') to each end of the input. Unless the computation attempts to overwrite
+them, they will be present in the output as well.
+
+LIMITATIONS
+
+The tape size cannot be increased past the size of the input string. Attempts
+to move the head past the edge of the initial tape will fail as the
+self-assembler will not search for tiles to place there. If scratch space is
+required for computation, an extra "blank" token may be added, or the boundary
+token may be used. However, if using boundary tokens off the true boundary,
+take care not to write past the edge of the tape.

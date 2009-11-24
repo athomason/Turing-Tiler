@@ -1,0 +1,66 @@
+# Write a 1 at positions whose distance from the tape origin is a power of 4, and write 0 at others
+
+# Strategy:
+# Starting with a tape which is presumed correct and ends in a 1, 'tag' all
+# existing symbols with an in-progress marker (call it X). Starting at the
+# right end of the tape, repeatedly find the rightmost marked symbol, then
+# unmark it and write 3 0s at the right end of the tape. Once no more marked
+# symbols exist, the tape has been copied 3x and the last digit can be set as a
+# 1.
+
+SYMBOL _ # blank; empty space where output 0 or 1 will be written
+SYMBOL 0 # unset bit
+SYMBOL 1 # set bit
+SYMBOL a # unset bit with 'X' marker (see below)
+SYMBOL b # set bit with 'X' marker (see below)
+SYMBOL * # end of tape on left or right
+
+# Pre/post-condition: no X on tape, rightmost symbol is a 1, head is leftmost
+# 1. Scan right to blank, marking each cell with X, goto 2
+TRANSITION 1 0 a r 1
+TRANSITION 1 1 b r 1
+TRANSITION 1 _ _ l 2
+TRANSITION 1 * * l 6
+
+# 2. Scan left until X (remove X, goto 7) or EOT (goto 3)
+TRANSITION 2 0 0 l 2
+TRANSITION 2 1 1 l 2
+TRANSITION 2 a 0 r 7
+TRANSITION 2 b 1 r 7
+TRANSITION 2 * * r 3
+
+# 3. Scan right to blank or EOT, move left, goto 4
+TRANSITION 3 0 0 r 3
+TRANSITION 3 1 1 r 3
+TRANSITION 3 _ _ l 4
+TRANSITION 3 * * l 4
+
+# 4. Write 1, goto 5
+TRANSITION 4 0 1 l 5
+TRANSITION 4 * * h 4 Not_primed
+
+# 5. Scan left to EOT, goto 1
+TRANSITION 5 0 0 l 5
+TRANSITION 5 1 1 l 5
+TRANSITION 5 * * r 1
+
+# 6. Right end-of-tape exception handler: rewind left and fix up X's on the way
+TRANSITION 6 0 0 l 6
+TRANSITION 6 1 1 l 6
+TRANSITION 6 a 0 l 6
+TRANSITION 6 b 1 l 6
+TRANSITION 6 * * h 6 OK
+
+# 7. Scan right to blank, write 0 (1st of 3), goto 8
+TRANSITION 7 0 0 r 7
+TRANSITION 7 1 1 r 7
+TRANSITION 7 _ 0 r 8
+TRANSITION 7 * * l 6
+
+# 8. Write 0 (2nd of 3), goto 9
+TRANSITION 8 _ 0 r 9
+TRANSITION 8 * * l 6
+
+# 9. Write 0 (3rd of 3), goto 2
+TRANSITION 9 _ 0 l 2
+TRANSITION 9 * * l 6

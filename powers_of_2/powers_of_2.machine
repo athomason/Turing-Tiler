@@ -1,0 +1,50 @@
+# Write a 1 at positions whose distance from the tape origin is a power of 2, and write 0 at others
+
+SYMBOL _ # blank; empty space where 0 or 1 will be written
+SYMBOL 0 # unset bit
+SYMBOL 1 # set bit
+SYMBOL a # unset bit with 'X' marker (see below)
+SYMBOL b # set bit with 'X' marker (see below)
+SYMBOL * # end of tape on left or right
+
+# Precondition: no X on tape, rightmost symbol is a 1, head is leftmost
+# 1. Scan right to blank, marking each cell with X, goto 2
+TRANSITION 1 0 a r 1
+TRANSITION 1 1 b r 1
+TRANSITION 1 _ _ l 2
+TRANSITION 1 * * l 7
+
+# 2. Scan left until X (remove X, goto 3) or EOT (goto 4)
+TRANSITION 2 0 0 l 2
+TRANSITION 2 1 1 l 2
+TRANSITION 2 a 0 r 3
+TRANSITION 2 b 1 r 3
+TRANSITION 2 * * r 4
+
+# 3. Scan right to blank, write 0, goto 2
+TRANSITION 3 0 0 r 3
+TRANSITION 3 1 1 r 3
+TRANSITION 3 _ 0 l 2
+TRANSITION 3 * * l 7
+
+# 4. Scan right to blank or EOT, move left, goto 5
+TRANSITION 4 0 0 r 4
+TRANSITION 4 1 1 r 4
+TRANSITION 4 _ _ l 5
+TRANSITION 4 * * l 5
+
+# 5. Write 1, goto 6
+TRANSITION 5 0 1 l 6
+TRANSITION 5 * * h 5 Not_primed
+
+# 6. Scan left to EOT, goto 1
+TRANSITION 6 0 0 l 6
+TRANSITION 6 1 1 l 6
+TRANSITION 6 * * r 1
+
+# 7. Error handler: on right end-of-tape, fixup X's
+TRANSITION 7 0 0 l 7
+TRANSITION 7 1 1 l 7
+TRANSITION 7 a 0 l 7
+TRANSITION 7 b 1 l 7
+TRANSITION 7 * * h 7 OK
