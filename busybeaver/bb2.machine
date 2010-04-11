@@ -1,0 +1,12 @@
+# Implementation of the champion 2 state, 2 symbol Busy Beaver machine
+SYMBOL 0
+SYMBOL 1
+
+START A
+OFFSET 2
+
+TRANSITION A 0 1 r B
+TRANSITION B 0 1 l A
+
+TRANSITION A 1 1 l B
+TRANSITION B 1 1 h B 1

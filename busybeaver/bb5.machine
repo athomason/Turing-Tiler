@@ -1,0 +1,17 @@
+# Implementation of the current best 5 state, 2 symbol Busy Beaver machine
+SYMBOL 0
+SYMBOL 1
+
+START A
+
+TRANSITION A 0 1 r B
+TRANSITION B 0 1 r C
+TRANSITION C 0 1 r D
+TRANSITION D 0 1 l A
+TRANSITION E 0 1 h E 1
+
+TRANSITION A 1 1 l C
+TRANSITION B 1 1 r B
+TRANSITION C 1 0 l E
+TRANSITION D 1 1 l D
+TRANSITION E 1 0 l A
