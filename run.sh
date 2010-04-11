@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 PWD=`pwd`
 BASE=`basename $PWD`
 if [[ ! -e $BASE.machine ]]; then
