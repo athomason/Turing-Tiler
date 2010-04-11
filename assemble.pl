@@ -30,7 +30,7 @@ GetOptions(
     'max-depth=i'               => \(my $max_depth              = 100),
     'ignore-depth-failure!'     => \(my $ignore_depth_failure),
 
-    'font=s'                    => \(my $ttf_font               = '/usr/share/fonts/ttf-bitstream-vera/Vera.ttf'),
+    'font=s'                    => \(my $ttf_font               = '/usr/share/fonts/truetype/ttf-bitstream-vera/Vera.ttf'),
     'font-size=f'               => \(my $font_size),
 
     # 0/vert is best for portrait or web (top->down)
@@ -80,6 +80,7 @@ my $name = $machine_filename; $name =~ s,.*/,,; $name =~ s/\..*//;
 my @symbols;
 my @transitions;
 my $initial_state = 1;
+my $initial_location = 0;
 
 print STDERR "Parsing machine...\n";
 
@@ -100,6 +101,10 @@ while ( <MACHINEFILE> ) {
     }
     elsif ( /^START\s+(\S+)/ ) {
         $initial_state = $1;
+    }
+    elsif ( /^OFFSET\s+(\d+)/ ) {
+        $initial_location = $1;
+        die if $initial_location < 0;
     }
     elsif ( /^TRANSITION\s+
         (\S+)\s+ # head state
@@ -352,17 +357,15 @@ for my $input_string ( @input_strings ) {
 
     # annotate initial input with head semantics before generating starter tiles
     my @cells;
+    push @cells, { head => 0, symbol => $_ } for split //, $input_string;
+    $cells[$initial_location]{head} = 1;
 
-    # put boundary symbol at beginning
-    push @cells, { head => 0, symbol => $boundary_symbol };
-
-    my @input_chars = split //, $input_string;
-    # first character in string is always the initial position
-    push @cells, { head => 1, symbol => shift @input_chars };
-    push @cells, { head => 0, symbol => shift @input_chars } while @input_chars;
-
-    # put boundary symbol at end
-    push @cells, { head => 0, symbol => $boundary_symbol };
+    # wrap in boundary symbols at beginning and end
+    @cells = (
+        { head => 0, symbol => $boundary_symbol },
+        @cells,
+        { head => 0, symbol => $boundary_symbol },
+    );
 
     # seed assembly with starter tiles from cells
     my @assembly = [ ];
