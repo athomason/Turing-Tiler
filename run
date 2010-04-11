@@ -14,6 +14,6 @@ for my $name (@machines) {
     die "$name.machine doesn't exist\n" unless -e "$name.machine";
     die "$name.inputs doesn't exist\n" unless -e "$name.inputs";
 
-    system "../machine2dot.pl --html < $name.machine | dot -Tpng -o $name.png";
+    system "../machine2png.pl $name.machine";
     system "xargs ../assemble.pl $name.machine $@ < $name.inputs";
 }

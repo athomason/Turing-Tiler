@@ -53,8 +53,7 @@ be found, the assembly will stall and the computation will fail without output
 (though a tiling reflecting this will still be generated).
 
 4. Verify the machine definition by generating a Turing diagram from the
-definition file using machine2dot.pl. This script produces a file which may be
-processed by dot(1) to create a png, postscript, or other graphic file
+definition file using machine2png.pl. This script produces a graphic file
 corresponding to the machine definition as interpreted by the program.
 
 5. Generate a tape specification (i.e., initial tape state) using
