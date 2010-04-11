@@ -70,7 +70,7 @@ are:
 
 Example:
 
-    ./assembler.pl example.machine abcba
+    ./assemble.pl example.machine abcba
 
 will run the machine defined in example.machine with the input string "abcba".
 The assembler will automatically add bracketing boundary tokens (by default,
