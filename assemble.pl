@@ -77,7 +77,7 @@ my $font_x = $font_bounds[ 6 ];
 my $font_y = $font_bounds[ 7 ];
 
 my $name = $machine_filename; $name =~ s,.*/,,; $name =~ s/\..*//;
-my @symbols;
+my %symbols;
 my @transitions;
 my $initial_state = 1;
 my $initial_location = 0;
@@ -97,14 +97,14 @@ while ( <MACHINEFILE> ) {
         $name = $1;
     }
     elsif ( /^SYMBOL\s+(\S+)/ ) {
-        push @symbols, $1;
+        $symbols{$1}++;
     }
     elsif ( /^START\s+(\S+)/ ) {
         $initial_state = $1;
     }
     elsif ( /^OFFSET\s+(\d+)/ ) {
         $initial_location = $1;
-        die if $initial_location < 0;
+        die "initial location must be nonnegative" if $initial_location < 0;
     }
     elsif ( /^TRANSITION\s+
         (\S+)\s+ # head state
@@ -133,8 +133,10 @@ while ( <MACHINEFILE> ) {
 }
 close MACHINEFILE;
 
-die "Error: no symbols specified" unless @symbols;
+die "Error: no symbols specified" unless %symbols;
 die "Error: no transitions specified" unless @transitions;
+
+$symbols{$boundary_symbol}++;
 
 # the tile "pool": things the self-assembler can draw from
 my @tiles;
@@ -145,7 +147,7 @@ print STDERR "Generating tileset 1/3...\n";
 for my $transition ( @transitions ) {
     if ( $transition->{ move } eq 'L' ) {
         push @tiles, {
-            name => "transition-$transition->{ oldstate }-$transition->{ readsymbol }.png",
+            name => "transition-$transition->{ oldstate }-$transition->{ readsymbol }",
             sides => {
                 TOP, {
                     bond_strength => 1,
@@ -168,7 +170,7 @@ for my $transition ( @transitions ) {
     }
     elsif ( $transition->{ move } eq 'R' ) {
         push @tiles, {
-            name => "transition-$transition->{ oldstate }-$transition->{ readsymbol }.png",
+            name => "transition-$transition->{ oldstate }-$transition->{ readsymbol }",
             sides => {
                 TOP, {
                     bond_strength => 1,
@@ -191,7 +193,7 @@ for my $transition ( @transitions ) {
     }
     elsif ( $transition->{ move } eq 'H' ) {
         push @tiles, {
-            name => "transition-$transition->{ oldstate }-$transition->{ readsymbol }.png",
+            name => "transition-$transition->{ oldstate }-$transition->{ readsymbol }",
             sides => {
                 TOP, {
                     bond_strength => 1,
@@ -224,10 +226,10 @@ my %states = map { ($_->{oldstate} => 1, $_->{newstate} => 1) } @transitions;
 
 # second set of tiles: exposes a double bond from the new head state
 for my $state (keys %states) {
-    for my $symbol ( @symbols ) {
+    for my $symbol (keys %symbols) {
         # moving left
         push @tiles, {
-            name => "move-$state-$symbol-left.png",
+            name => "move-$state-$symbol-left",
             sides => {
                 TOP, {
                     bond_strength => 2,
@@ -250,7 +252,7 @@ for my $state (keys %states) {
 
         # moving right
         push @tiles, {
-            name => "move-$state-$symbol-right.png",
+            name => "move-$state-$symbol-right",
             sides => {
                 TOP, {
                     bond_strength => 2,
@@ -276,10 +278,10 @@ for my $state (keys %states) {
 print STDERR "Generating tileset 3/3...\n";
 
 # third set of tiles: replicates non-head state cells
-for my $symbol ( @symbols ) {
+for my $symbol (keys %symbols) {
     # copying left of head
     push @tiles, {
-        name => "replicate-$symbol-left.png",
+        name => "replicate-$symbol-left",
         sides => {
             TOP, {
                 bond_strength => 1,
@@ -302,7 +304,7 @@ for my $symbol ( @symbols ) {
 
     # copying right of head
     push @tiles, {
-        name => "replicate-$symbol-right.png",
+        name => "replicate-$symbol-right",
         sides => {
             TOP, {
                 bond_strength => 1,
@@ -341,7 +343,7 @@ for my $tile ( @tiles ) {
 print STDERR "Drawing tile images...\n";
 
 my %color_cache;
-    
+
 # draw an image for each tile
 generateTileImage( $_ ) for @tiles;
 
@@ -349,7 +351,7 @@ for my $input_string ( @input_strings ) {
     print STDERR "Processing input $input_string...\n";
 
     # check that the input string has only legal symbols
-    my $symbol_re = sprintf "[^%s]", join '', @symbols;
+    my $symbol_re = sprintf "[^%s]", join '', keys %symbols;
     if ( $input_string =~ /($symbol_re)/ ) {
         warn "  Warning: invalid symbol ($1) encountered in input string\n";
         next;
@@ -443,7 +445,7 @@ print STDERR "Done!\n";
 # that fits in an empty spot adjacent to an existing tile. tiles may only be
 # added if at least two bonds are made in so doing (i.e. two single bonds or
 # one double bond).
-sub addTile { 
+sub addTile {
     my $assembly = shift;
     my $tiles = shift;
 
