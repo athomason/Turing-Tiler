@@ -9,7 +9,7 @@ my $string = shift;
 
 my $me = $0;
 $me =~ s,.*/,,;
-die "Usage: $me <machine_spec> <input_string>\n" unless defined $filename && defined $string; 
+die "Usage: $me <machine_spec> <input_string>\n" unless defined $filename && defined $string;
 
 $string = lc $string;
 

@@ -29,7 +29,7 @@ my $filename = shift @ARGV;
 
 my $me = $0;
 $me =~ s,.*/,,;
-die "Usage: $me <tape_spec>\n" unless $filename; 
+die "Usage: $me <tape_spec>\n" unless $filename;
 
 my @cells;
 my $base;
@@ -57,7 +57,7 @@ my @tiles;
 if ( @cells == 1 ) {
     my $tile = GD::Image->new( WIDTH, HEIGHT );
     my $white = $tile->colorAllocate( 255, 255, 255 );
-    my $black = $tile->colorAllocate( 0, 0, 0 );    
+    my $black = $tile->colorAllocate( 0, 0, 0 );
     drawCell( $tile, $cells[ 0 ], 1, 1, $black );
     push @tiles, $tile;
 }
@@ -67,22 +67,22 @@ else {
 
     my $lefttile = GD::Image->new( WIDTH, HEIGHT );
     my $leftwhite = $lefttile->colorAllocate( 255, 255, 255 );
-    my $leftblack = $lefttile->colorAllocate( 0, 0, 0 );    
+    my $leftblack = $lefttile->colorAllocate( 0, 0, 0 );
     drawCell( $lefttile, $leftcell, 1, 0, $leftblack );
     push @tiles, $lefttile;
 
     for my $cell ( @cells ) {
         my $midtile = GD::Image->new( WIDTH, HEIGHT );
         my $midwhite = $midtile->colorAllocate( 255, 255, 255 );
-        my $midblack = $midtile->colorAllocate( 0, 0, 0 );    
-    
+        my $midblack = $midtile->colorAllocate( 0, 0, 0 );
+
         drawCell( $midtile, $cell, 0, 0, $midblack );
         push @tiles, $midtile;
     }
 
     my $righttile = GD::Image->new( WIDTH, HEIGHT );
     my $rightwhite = $righttile->colorAllocate( 255, 255, 255 );
-    my $rightblack = $righttile->colorAllocate( 0, 0, 0 );    
+    my $rightblack = $righttile->colorAllocate( 0, 0, 0 );
     drawCell( $righttile, $rightcell, 0, 1, $rightblack );
 
     push @tiles, $righttile;

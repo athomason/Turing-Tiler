@@ -1,10 +1,11 @@
-# Write a 1 at positions where the distance from the tape origin as represented in binary has an odd number of bits set to 1, and 0 elsewhere.
+# Write a 1 at positions where the distance from the tape origin--as
+# represented in binary--has an odd number of bits set to 1, and 0 elsewhere.
 
 # Strategy:
 #
 # The above formula (the sum of the digits of the position number in base 2,
 # modulo 2) generates a pattern that repeats in powers of 4. At iteration n of
-# the pattern with a string of bits s set to 0 or 1, the next iteration n+1 has
+# the pattern with a string s of bits set to 0 or 1, the next iteration n+1 has
 # bits set as sSSs, where S is the complement of s. That is, starting from a
 # pattern of 0, the next pattern is 0110, and the next is 0110100110010110 ad
 # infinitum. With n=0 corresponding to the seed tape with one bit set to 0,
@@ -35,7 +36,7 @@ SYMBOL * # end of tape on left or right
 #    Scan left to X, remove it, move left
 #      If a digit, write an X, redo
 #      If EOT, scan right to Y, move left, goto next pass
-#   Pass 4: 
+#   Pass 4:
 #    Erase Y, goto pass 0
 #
 #   NB: Transitions between passes can be optimized such that the last state of

@@ -34,7 +34,7 @@ my $filename = shift @ARGV;
 
 my $me = $0;
 $me =~ s,.*/,,;
-die "Usage: $me <machine_spec>\n" unless $filename; 
+die "Usage: $me <machine_spec>\n" unless $filename;
 
 open FILE, "< $filename" or die "Could not open $filename";
 while ( <FILE> ) {
@@ -253,8 +253,8 @@ for my $symbol ( @symbols ) {
 for my $tile ( @tiles ) {
     my $img = new GD::Image( WIDTH, HEIGHT );
     my $white = $img->colorAllocate( 255, 255, 255 );
-    my $black = $img->colorAllocate( 0, 0, 0 );    
-    
+    my $black = $img->colorAllocate( 0, 0, 0 );
+
     for my $side ( TOP, BOTTOM, LEFT, RIGHT ) {
         my $strength = $tile->{ sides }{ $side }{ bond_strength };
         my $label = $tile->{ sides }{ $side }{ label };
@@ -263,9 +263,9 @@ for my $tile ( @tiles ) {
     }
 
     open OUTPUT, "> $tile->{ name }";
-    
+
     binmode OUTPUT;
-    
+
     print OUTPUT $img->png;
 
     close OUTPUT;
