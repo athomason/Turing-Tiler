@@ -9,16 +9,18 @@ import (
 	"strings"
 )
 
-type Transition struct {
-	OldState, ReadSymbol, WriteSymbol, Move, NewState, Output string
-}
-
 type Machine struct {
 	Name            string
 	Symbols         []string
 	Transitions     []Transition
 	InitialState    string
 	InitialLocation int
+}
+
+type Transition struct {
+	OldState, ReadSymbol, WriteSymbol string
+	Move                              Direction
+	NewState, Output                  string
 }
 
 var (
@@ -84,8 +86,8 @@ func (t *Tiler) ParseMachine() {
 					(?:\s+(\S+))? # halting states' output
 					/x
 			*/
-			t := Transition{c[1], c[2], c[3], c[4], c[5], c[6]}
-			if t.Output != "" && strings.ToUpper(t.Move) != "H" {
+			t := Transition{c[1], c[2], c[3], letterToDirection(c[4]), c[5], c[6]}
+			if t.Output != "" && !(t.Move == 'h' || t.Move == 'H') {
 				log.Panicf("Halting string given for non-halting transition: %q", line)
 			}
 			m.Transitions = append(m.Transitions, t)
@@ -102,4 +104,17 @@ func (t *Tiler) ParseMachine() {
 	}
 	m.Symbols = append(m.Symbols, t.BoundarySymbol)
 	t.machine = m
+}
+
+func letterToDirection(letter string) Direction {
+	switch strings.ToLower(letter) {
+	case "l":
+		return Left
+	case "r":
+		return Right
+	case "h":
+		return Halt
+	}
+	log.Panicf("parserTransitionRx should only match /[HhLlRr]/ but got %q", letter)
+	return 0
 }

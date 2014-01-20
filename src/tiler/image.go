@@ -20,119 +20,119 @@ func (t *Tiler) DrawImages() {
 
 	_ = font
 
-/*
-   # TODO
+	/*
+		   # TODO
 
-	GD::Image->trueColor(1);
+			GD::Image->trueColor(1);
 
-	# figure out how big a 'normal' character is for approximate layout purposes
-	my @font_bounds = GD::Image->stringFT( 0, $ttf_font, $font_size, 0, 0, 0, '5' );
-	die "Error: couldn't use font $ttf_font:$font_size: $@" unless @font_bounds;
-	my $font_w = $font_bounds[ 2 ] - $font_bounds[ 6 ];
-	my $font_h = $font_bounds[ 3 ] - $font_bounds[ 7 ];
-	my $font_x = $font_bounds[ 6 ];
-	my $font_y = $font_bounds[ 7 ];
+			# figure out how big a 'normal' character is for approximate layout purposes
+			my @font_bounds = GD::Image->stringFT( 0, $ttf_font, $font_size, 0, 0, 0, '5' );
+			die "Error: couldn't use font $ttf_font:$font_size: $@" unless @font_bounds;
+			my $font_w = $font_bounds[ 2 ] - $font_bounds[ 6 ];
+			my $font_h = $font_bounds[ 3 ] - $font_bounds[ 7 ];
+			my $font_x = $font_bounds[ 6 ];
+			my $font_y = $font_bounds[ 7 ];
 
-	print STDERR "Drawing tile images...\n";
+			print STDERR "Drawing tile images...\n";
 
-	my %color_cache;
+			my %color_cache;
 
-	# draw an image for each tile
-	generateTileImage( $_ ) for @tiles;
+			# draw an image for each tile
+			generateTileImage( $_ ) for @tiles;
 
-	for my $input_string ( @input_strings ) {
-		print STDERR "Processing input $input_string...\n";
+			for my $input_string ( @input_strings ) {
+				print STDERR "Processing input $input_string...\n";
 
-		# check that the input string has only legal symbols
-		my $symbol_re = sprintf "[^%s]", join '', keys %symbols;
-		if ( $input_string =~ /($symbol_re)/ ) {
-			warn "  Warning: invalid symbol ($1) encountered in input string\n";
-			next;
-		}
+				# check that the input string has only legal symbols
+				my $symbol_re = sprintf "[^%s]", join '', keys %symbols;
+				if ( $input_string =~ /($symbol_re)/ ) {
+					warn "  Warning: invalid symbol ($1) encountered in input string\n";
+					next;
+				}
 
-		# annotate initial input with head semantics before generating starter tiles
-		my @cells;
-		push @cells, { head => 0, symbol => $_ } for split //, $input_string;
-		$cells[$initial_location]{head} = 1;
+				# annotate initial input with head semantics before generating starter tiles
+				my @cells;
+				push @cells, { head => 0, symbol => $_ } for split //, $input_string;
+				$cells[$initial_location]{head} = 1;
 
-		# wrap in boundary symbols at beginning and end
-		@cells = (
-			{ head => 0, symbol => $boundary_symbol },
-			@cells,
-			{ head => 0, symbol => $boundary_symbol },
-		);
-
-		# seed assembly with starter tiles from cells
-		my @assembly = [ ];
-
-		print STDERR "  Generating starter tiles...\n";
-
-		my $leftcell = shift @cells;
-		my $rightcell = pop @cells;
-		push @{ $assembly[ 0 ] }, cellToTile( $leftcell,  1, 0 );
-		push @{ $assembly[ 0 ] }, cellToTile( $_,         0, 0 ) for @cells;
-		push @{ $assembly[ 0 ] }, cellToTile( $rightcell, 0, 1 );
-
-		print STDERR "  Assembling transition tiles...\n";
-
-		# assemble until we hit a halting state or the limit is reached
-		1 while addTile( \@assembly, \@tiles ) && ( !$max_depth || @assembly <= $max_depth + 1 );
-
-		if ( $max_depth && @assembly > $max_depth + 1 ) {
-			pop @assembly; # remove the offending line
-			warn "  Warning: assembly hit maximum depth ($max_depth), increase with --max-depth=\n";
-			next unless $ignore_depth_failure;
-		}
-
-		# remove trailing blank line
-		pop @assembly;
-
-		my $size_x = @{ $assembly[ 0 ] };
-		my $size_y = @assembly;
-
-		print STDERR "  Transforming matrix...\n";
-
-		# rotation occurs after assembly so that the assembler routine may concern
-		# itself only with a single logical layout (bottom-up). here we rotate the
-		# assembly matrix to the desired final orientation; tile orientation is
-		# also rotated, but in the drawing routines
-		( $size_x, $size_y, @assembly ) = computeRotated( \@assembly, $size_x, $size_y );
-
-		# create the master canvas containing the record of the entire computation
-		my $target = GD::Image->new( $tile_width * $size_x - $size_x + 1, $tile_height * $size_y - $size_y + 1 );
-		$target->saveAlpha( 1 );
-
-		#use Data::Dumper;
-		#print Data::Dumper->Dump( [ \@tiles, \@assembly ], [ qw/ tiles assembly / ] );
-
-		print STDERR "  Generating canvas...\n";
-
-		# copy component tiles to the master canvas
-		for my $i ( 0 .. @assembly - 1 ) {
-			for my $j ( 0 .. @{ $assembly[ $i ] } - 1 ) {
-				my $src = $assembly[ $i ][ $j ]{ image };
-				next unless defined $src; # silently ignored missing tiles
-				$target->copy( $src,
-					$tile_width * $j - $j,
-					$tile_height * ( @assembly - $i - 1 ) - ( @assembly - $i - 1 ),
-					0, 0, $tile_width, $tile_height
+				# wrap in boundary symbols at beginning and end
+				@cells = (
+					{ head => 0, symbol => $boundary_symbol },
+					@cells,
+					{ head => 0, symbol => $boundary_symbol },
 				);
+
+				# seed assembly with starter tiles from cells
+				my @assembly = [ ];
+
+				print STDERR "  Generating starter tiles...\n";
+
+				my $leftcell = shift @cells;
+				my $rightcell = pop @cells;
+				push @{ $assembly[ 0 ] }, cellToTile( $leftcell,  1, 0 );
+				push @{ $assembly[ 0 ] }, cellToTile( $_,         0, 0 ) for @cells;
+				push @{ $assembly[ 0 ] }, cellToTile( $rightcell, 0, 1 );
+
+				print STDERR "  Assembling transition tiles...\n";
+
+				# assemble until we hit a halting state or the limit is reached
+				1 while addTile( \@assembly, \@tiles ) && ( !$max_depth || @assembly <= $max_depth + 1 );
+
+				if ( $max_depth && @assembly > $max_depth + 1 ) {
+					pop @assembly; # remove the offending line
+					warn "  Warning: assembly hit maximum depth ($max_depth), increase with --max-depth=\n";
+					next unless $ignore_depth_failure;
+				}
+
+				# remove trailing blank line
+				pop @assembly;
+
+				my $size_x = @{ $assembly[ 0 ] };
+				my $size_y = @assembly;
+
+				print STDERR "  Transforming matrix...\n";
+
+				# rotation occurs after assembly so that the assembler routine may concern
+				# itself only with a single logical layout (bottom-up). here we rotate the
+				# assembly matrix to the desired final orientation; tile orientation is
+				# also rotated, but in the drawing routines
+				( $size_x, $size_y, @assembly ) = computeRotated( \@assembly, $size_x, $size_y );
+
+				# create the master canvas containing the record of the entire computation
+				my $target = GD::Image->new( $tile_width * $size_x - $size_x + 1, $tile_height * $size_y - $size_y + 1 );
+				$target->saveAlpha( 1 );
+
+				#use Data::Dumper;
+				#print Data::Dumper->Dump( [ \@tiles, \@assembly ], [ qw/ tiles assembly / ] );
+
+				print STDERR "  Generating canvas...\n";
+
+				# copy component tiles to the master canvas
+				for my $i ( 0 .. @assembly - 1 ) {
+					for my $j ( 0 .. @{ $assembly[ $i ] } - 1 ) {
+						my $src = $assembly[ $i ][ $j ]{ image };
+						next unless defined $src; # silently ignored missing tiles
+						$target->copy( $src,
+							$tile_width * $j - $j,
+							$tile_height * ( @assembly - $i - 1 ) - ( @assembly - $i - 1 ),
+							0, 0, $tile_width, $tile_height
+						);
+					}
+				}
+
+				# save the output
+
+				my $output_file = "$name-$input_string.png";
+				print STDERR "  Saving image $output_file...\n";
+				open OUTPUT, ">", $output_file;
+				binmode OUTPUT;
+				print OUTPUT $target->png;
+				close OUTPUT;
 			}
-		}
 
-		# save the output
+			print STDERR "Done!\n";
 
-		my $output_file = "$name-$input_string.png";
-		print STDERR "  Saving image $output_file...\n";
-		open OUTPUT, ">", $output_file;
-		binmode OUTPUT;
-		print OUTPUT $target->png;
-		close OUTPUT;
-	}
-
-	print STDERR "Done!\n";
-
-	# END MAIN
+			# END MAIN
 	*/
 }
 
