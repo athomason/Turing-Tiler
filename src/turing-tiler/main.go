@@ -3,12 +3,14 @@ package main
 import (
 	"flag"
 	"log"
+	"unicode/utf8"
 
 	"tiler"
 )
 
 func main() {
 	var options tiler.Options
+	var boundarySymbol string
 	// 4/3 is a reasonable aspect ratio for single-character states and symbols
 	flag.IntVar(&options.TileWidth, "tile-width", 32, "tile width in pixels")
 	flag.IntVar(&options.TileHeight, "tile-height", 24, "tile height in pixels")
@@ -18,7 +20,8 @@ func main() {
 	flag.IntVar(&options.Rotation, "rotation", 0, "rotation from 0-3")
 	flag.BoolVar(&options.FlipHorizontal, "flip-horizontal", false, "flip the output horizontally")
 	flag.BoolVar(&options.FlipVertical, "flip-vertical", false, "flip the output vertically")
-	flag.StringVar(&options.BoundarySymbol, "boundary-symbol", "*", "boundary symbol")
+	flag.StringVar(&options.ColorTweak, "color-tweak", "", "string which consistently but unpredictably changes color selection")
+	flag.StringVar(&boundarySymbol, "boundary-symbol", "*", "boundary symbol")
 	flag.Parse()
 
 	if flag.NArg() < 2 {
@@ -27,6 +30,7 @@ func main() {
 
 	options.MachineFile = flag.Arg(0)
 	options.Inputs = flag.Args()[1:]
+	options.BoundarySymbol, _ = utf8.DecodeRune([]byte(boundarySymbol))
 
 	log.Printf("Processing %s, %v", options.MachineFile, options.Inputs)
 	tiler := options.NewTiler()

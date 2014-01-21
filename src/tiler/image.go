@@ -1,11 +1,27 @@
 package tiler
 
 import (
+	"bytes"
+	"crypto/md5"
+	"encoding/binary"
+	"fmt"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
 	"io/ioutil"
 	"log"
+	"math"
+    "os"
+	"regexp"
 
 	"code.google.com/p/freetype-go/freetype"
 )
+
+type Cell struct {
+	Symbol rune
+	Head   bool
+}
 
 func (t *Tiler) DrawImages() {
 	bytes, err := ioutil.ReadFile(t.FontPath)
@@ -20,128 +36,128 @@ func (t *Tiler) DrawImages() {
 
 	_ = font
 
+	log.Println("Generating tile caches...")
+	type String2Tuple struct {
+		first, second string
+	}
+	tileCacheBottom := make(map[string]*Tile)
+	tileCacheLeft := make(map[String2Tuple]*Tile)
+	tileCacheRight := make(map[String2Tuple]*Tile)
+	for _, tile := range t.tiles {
+		tileCacheBottom[tile.Sides[Down].Label] = &tile
+		tileCacheLeft[String2Tuple{tile.Sides[Left].Label, tile.Sides[Down].Label}] = &tile
+		tileCacheRight[String2Tuple{tile.Sides[Right].Label, tile.Sides[Down].Label}] = &tile
+	}
+
+	log.Println("Drawing tile images...")
+	for _, tile := range t.tiles {
+		tile.Image = t.generateImage(&tile)
+	}
+
 	/*
-		   # TODO
+	   # TODO
 
-			GD::Image->trueColor(1);
-
-			# figure out how big a 'normal' character is for approximate layout purposes
-			my @font_bounds = GD::Image->stringFT( 0, $ttf_font, $font_size, 0, 0, 0, '5' );
-			die "Error: couldn't use font $ttf_font:$font_size: $@" unless @font_bounds;
-			my $font_w = $font_bounds[ 2 ] - $font_bounds[ 6 ];
-			my $font_h = $font_bounds[ 3 ] - $font_bounds[ 7 ];
-			my $font_x = $font_bounds[ 6 ];
-			my $font_y = $font_bounds[ 7 ];
-
-			print STDERR "Drawing tile images...\n";
-
-			my %color_cache;
-
-			# draw an image for each tile
-			generateTileImage( $_ ) for @tiles;
-
-			for my $input_string ( @input_strings ) {
-				print STDERR "Processing input $input_string...\n";
-
-				# check that the input string has only legal symbols
-				my $symbol_re = sprintf "[^%s]", join '', keys %symbols;
-				if ( $input_string =~ /($symbol_re)/ ) {
-					warn "  Warning: invalid symbol ($1) encountered in input string\n";
-					next;
-				}
-
-				# annotate initial input with head semantics before generating starter tiles
-				my @cells;
-				push @cells, { head => 0, symbol => $_ } for split //, $input_string;
-				$cells[$initial_location]{head} = 1;
-
-				# wrap in boundary symbols at beginning and end
-				@cells = (
-					{ head => 0, symbol => $boundary_symbol },
-					@cells,
-					{ head => 0, symbol => $boundary_symbol },
-				);
-
-				# seed assembly with starter tiles from cells
-				my @assembly = [ ];
-
-				print STDERR "  Generating starter tiles...\n";
-
-				my $leftcell = shift @cells;
-				my $rightcell = pop @cells;
-				push @{ $assembly[ 0 ] }, cellToTile( $leftcell,  1, 0 );
-				push @{ $assembly[ 0 ] }, cellToTile( $_,         0, 0 ) for @cells;
-				push @{ $assembly[ 0 ] }, cellToTile( $rightcell, 0, 1 );
-
-				print STDERR "  Assembling transition tiles...\n";
-
-				# assemble until we hit a halting state or the limit is reached
-				1 while addTile( \@assembly, \@tiles ) && ( !$max_depth || @assembly <= $max_depth + 1 );
-
-				if ( $max_depth && @assembly > $max_depth + 1 ) {
-					pop @assembly; # remove the offending line
-					warn "  Warning: assembly hit maximum depth ($max_depth), increase with --max-depth=\n";
-					next unless $ignore_depth_failure;
-				}
-
-				# remove trailing blank line
-				pop @assembly;
-
-				my $size_x = @{ $assembly[ 0 ] };
-				my $size_y = @assembly;
-
-				print STDERR "  Transforming matrix...\n";
-
-				# rotation occurs after assembly so that the assembler routine may concern
-				# itself only with a single logical layout (bottom-up). here we rotate the
-				# assembly matrix to the desired final orientation; tile orientation is
-				# also rotated, but in the drawing routines
-				( $size_x, $size_y, @assembly ) = computeRotated( \@assembly, $size_x, $size_y );
-
-				# create the master canvas containing the record of the entire computation
-				my $target = GD::Image->new( $tile_width * $size_x - $size_x + 1, $tile_height * $size_y - $size_y + 1 );
-				$target->saveAlpha( 1 );
-
-				#use Data::Dumper;
-				#print Data::Dumper->Dump( [ \@tiles, \@assembly ], [ qw/ tiles assembly / ] );
-
-				print STDERR "  Generating canvas...\n";
-
-				# copy component tiles to the master canvas
-				for my $i ( 0 .. @assembly - 1 ) {
-					for my $j ( 0 .. @{ $assembly[ $i ] } - 1 ) {
-						my $src = $assembly[ $i ][ $j ]{ image };
-						next unless defined $src; # silently ignored missing tiles
-						$target->copy( $src,
-							$tile_width * $j - $j,
-							$tile_height * ( @assembly - $i - 1 ) - ( @assembly - $i - 1 ),
-							0, 0, $tile_width, $tile_height
-						);
-					}
-				}
-
-				# save the output
-
-				my $output_file = "$name-$input_string.png";
-				print STDERR "  Saving image $output_file...\n";
-				open OUTPUT, ">", $output_file;
-				binmode OUTPUT;
-				print OUTPUT $target->png;
-				close OUTPUT;
-			}
-
-			print STDERR "Done!\n";
-
-			# END MAIN
+	   # figure out how big a 'normal' character is for approximate layout purposes
+	   my @font_bounds = GD::Image->stringFT( 0, $ttf_font, $font_size, 0, 0, 0, '5' );
+	   die "Error: couldn't use font $ttf_font:$font_size: $@" unless @font_bounds;
+	   my $font_w = $font_bounds[ 2 ] - $font_bounds[ 6 ];
+	   my $font_h = $font_bounds[ 3 ] - $font_bounds[ 7 ];
+	   my $font_x = $font_bounds[ 6 ];
+	   my $font_y = $font_bounds[ 7 ];
 	*/
+	for _, input := range t.Inputs {
+		log.Printf("Processing input %q...", input)
+
+		// check that the input string has only legal symbols
+		symbolRx := regexp.MustCompile(fmt.Sprintf("[^%s]", string(t.Symbols)))
+		if symbolRx.MatchString(input) {
+			log.Printf("  Warning: invalid symbol encountered in input string %q", input)
+			continue
+		}
+
+		// annotate initial input with head semantics before generating starter tiles
+		cells := make([]Cell, len(input))
+		for i, r := range input {
+			cells[i] = Cell{r, i == t.InitialLocation}
+		}
+
+		log.Printf("Generating starter tiles...")
+
+		// seed first row of assembly with starter tiles from input-generated cells
+		assembly := [][]*Tile{make([]*Tile, len(cells)+2)}
+
+		// wrap with boundary symbols at beginning and end
+		assembly[0][0] = t.cellToTile(&Cell{t.BoundarySymbol, false}, true, false)
+		for i, cell := range cells {
+			assembly[0][i+1] = t.cellToTile(&cell, false, false)
+		}
+		assembly[0][len(assembly)-1] = t.cellToTile(&Cell{t.BoundarySymbol, false}, false, true)
+
+		log.Printf("Assembling transition tiles...")
+		/*
+
+		       // assemble until we hit a halting state or the limit is reached
+		       1 while addTile( \@assembly, \@tiles ) && ( !$max_depth || @assembly <= $max_depth + 1 );
+
+		       if ( $max_depth && @assembly > $max_depth + 1 ) {
+		           pop @assembly; // remove the offending line
+		           warn "  Warning: assembly hit maximum depth ($max_depth), increase with --max-depth=\n";
+		           next unless $ignore_depth_failure;
+		       }
+
+		       // remove trailing blank line
+		       pop @assembly;
+
+		       my $size_x = @{ $assembly[ 0 ] };
+		       my $size_y = @assembly;
+
+		       print STDERR "  Transforming matrix...\n";
+
+		       // rotation occurs after assembly so that the assembler routine may concern
+		       // itself only with a single logical layout (bottom-up). here we rotate the
+		       // assembly matrix to the desired final orientation; tile orientation is
+		       // also rotated, but in the drawing routines
+		       ( $size_x, $size_y, @assembly ) = computeRotated( \@assembly, $size_x, $size_y );
+
+		       // create the master canvas containing the record of the entire computation
+		       my $target = GD::Image->new( t.TileWidth * $size_x - $size_x + 1, t.TileHeight * $size_y - $size_y + 1 );
+		       $target->saveAlpha( 1 );
+
+		       print STDERR "  Generating canvas...\n";
+
+		       // copy component tiles to the master canvas
+		       for my $i ( 0 .. @assembly - 1 ) {
+		           for my $j ( 0 .. @{ $assembly[ $i ] } - 1 ) {
+		               my $src = $assembly[ $i ][ $j ]{ image };
+		               next unless defined $src; // silently ignored missing tiles
+		               $target->copy( $src,
+		                   t.TileWidth * $j - $j,
+		                   t.TileHeight * ( @assembly - $i - 1 ) - ( @assembly - $i - 1 ),
+		                   0, 0, t.TileWidth, t.TileHeight
+		               );
+		           }
+		       }
+
+		       // save the output
+
+		       my $output_file = "$name-$input_string.png";
+		       print STDERR "  Saving image $output_file...\n";
+		       open OUTPUT, ">", $output_file;
+		       binmode OUTPUT;
+		       print OUTPUT $target->png;
+		       close OUTPUT;
+		   }
+		*/
+		log.Printf("Done!")
+	}
 }
 
 /*
 
-# starting with the current assembly, try to add any tile drawn from the pool
-# that fits in an empty spot adjacent to an existing tile. tiles may only be
-# added if at least two bonds are made in so doing (i.e. two single bonds or
-# one double bond).
+// starting with the current assembly, try to add any tile drawn from the pool
+// that fits in an empty spot adjacent to an existing tile. tiles may only be
+// added if at least two bonds are made in so doing (i.e. two single bonds or
+// one double bond).
 sub addTile {
     my $assembly = shift;
     my $tiles = shift;
@@ -216,235 +232,213 @@ sub addTile {
     # couldn't find any tile to add anywhere, so halt
     return 0;
 }
+*/
 
-# build an initial tile from a cell definition
-sub cellToTile {
-    my $cell = shift;
-    my $left = shift;
-    my $right = shift;
-
-    my $tile = {
-        name => "seed",
-        sides => {
-            TOP, {
-                bond_strength => $cell->{ head } ? 2 : 1,
-                label => $cell->{ head } ?
-                    "$initial_state $cell->{ symbol }" :
-                    $cell->{ symbol },
-            },
-            BOTTOM, {
-                bond_strength => 1,
-                label => '',
-            },
-            LEFT, {
-                bond_strength => $left ? 1 : 2,
-                label => '',
-            },
-            RIGHT, {
-                bond_strength => $right ? 1 : 2,
-                label => '',
-            },
-        },
-    };
-
-    generateTileImage( $tile );
-
-    return $tile;
+func bondStrength(strong bool) int {
+	if strong {
+		return 2
+	}
+	return 1
 }
 
-sub generateTileImage {
-    my $tile = shift;
-
-    my $img = new GD::Image( $tile_width, $tile_height );
-
-    my $bg_color = $img->colorAllocate( getLabelColor(
-        sprintf( "background%d", exists $tile->{ final } ), 1
-    ) );
-    $img->filledRectangle( 0, 0, $tile_width, $tile_height, $bg_color );
-
-    for my $side ( TOP, BOTTOM, LEFT, RIGHT ) {
-        my $strength = $tile->{ sides }{ $side }{ bond_strength };
-        my $label = $tile->{ sides }{ $side }{ label };
-
-        my $oriented_label = sprintf "%d$label$strength", $side % 2;
-        my $color = $img->colorAllocate( getLabelColor( $oriented_label ) );
-
-        drawBond( $img, $side, $strength, $color );
-        drawString( $img, $side, $strength, $label, $color );
-    }
-
-    $tile->{ image } = $img;
+// build an initial tile from a cell definition
+func (t *Tiler) cellToTile(cell *Cell, left, right bool) *Tile {
+	var upLabel string
+	if cell.Head {
+		upLabel = fmt.Sprintf("%s %s", t.InitialState)
+	} else {
+		upLabel = string(cell.Symbol)
+	}
+	tile := Tile{
+		Name: "seed",
+		Sides: Bonds{
+			Up:    Bond{bondStrength(cell.Head), upLabel},
+			Down:  Bond{1, ""},
+			Left:  Bond{bondStrength(left), ""},
+			Right: Bond{bondStrength(right), ""},
+		},
+	}
+	tile.Image = t.generateImage(&tile)
+	return &tile
 }
 
-# for the given label, return a visually well-distributed color that is always
-# the same but uncorrelated to the label's contents
-sub getLabelColor {
-    my $label = shift;
-    my $bright = shift || 0;
+func (t *Tiler) generateImage(tile *Tile) image.Image {
+	r := image.Rect(0, 0, t.TileWidth, t.TileHeight)
+	im := image.NewRGBA(r)
+	bgColor := t.getLabelColor(fmt.Sprintf("background%v", tile.Final), true)
+	draw.Draw(im, r, &image.Uniform{bgColor}, image.ZP, draw.Src)
 
-    return @{ $color_cache{ $label } } if exists $color_cache{ $label };
+	for _, side := range []Direction{Up, Down, Left, Right} {
+		strength := tile.Sides[side].Strength
+		label := tile.Sides[side].Label
 
-    # use a has function to get some random-ish data based on the label.
-    # here we get 32 bytes from MD5 and unpack the first 24 as longs.
-    use Digest::MD5;
-    $label .= $prng_tweak;
-    my $hash = Digest::MD5->md5( $label ) . Digest::MD5->md5( reverse $label );
-    my ( $r1, $r2, $r3 ) = unpack "L*", substr $hash, 0, 24;
-    # get a fractional value from the longs
-    $_ = exp( log( $_ ) - 32 * log 2 ) for ( $r1, $r2, $r3 );
+		orientedLabel := fmt.Sprintf("%d%s%d", side%2, label, strength)
+		color := t.getLabelColor(orientedLabel, false)
 
-    my $h = 0.0 + 1.0 * $r1;
-    my $s;
-    my $v;
-    if ( $bright ) {
-        $v = 0.9 + 0.1 * $r3;
-        $s = 0.0 + 0.02 * $r2;
+		t.drawBond(im, side, strength, color)
+		t.drawString(im, side, strength, color, label)
+	}
+    w, err := os.Create(fmt.Sprintf("%s.png", tile.Name))
+    if err != nil {
+        log.Fatal(err)
     }
-    else {
-        $v = 0.1 + 0.4 * $r3;
-        $s = 0.5 + 0.5 * $r2;
-    }
-
-    my $cp = int( $h * 6 );
-    my $cs = $h - $cp;
-    my $ca = ( 1 - $s ) * $v;
-    my $cb = ( 1 - ( $s * $cs ) ) * $v;
-    my $cc = ( 1 - ( $s * ( 1 - $cs ) ) ) * $v;
-
-    my ( $r, $g, $b );
-    if    ( $cp == 0 ) { $r = $v; $g = $cc; $b = $ca; }
-    elsif ( $cp == 1 ) { $r = $cb; $g = $v; $b = $ca; }
-    elsif ( $cp == 2 ) { $r = $ca; $g = $v; $b = $cc; }
-    elsif ( $cp == 3 ) { $r = $ca; $g = $cb; $b = $v; }
-    elsif ( $cp == 4 ) { $r = $cc; $g = $ca; $b = $v; }
-    elsif ( $cp == 5 ) { $r = $v; $g = $ca; $b = $cb; }
-
-    $r = 0 if $r < 0; $r = 1 if $r > 1;
-    $g = 0 if $g < 0; $g = 1 if $g > 1;
-    $b = 0 if $b < 0; $b = 1 if $b > 1;
-    $r *= 255;
-    $g *= 255;
-    $b *= 255;
-
-    my $values = [ int $r, int $g, int $b ];
-    $color_cache{ $label } = $values;
-
-    return @$values;
+    defer w.Close()
+    png.Encode(w, im)
+	return im
 }
 
-sub drawBond {
-    my $img = shift;
-    my $side = shift;
-    my $bond_strength = shift;
-    my $color = shift;
+// for the given label, return a visually well-distributed color that is always
+// the same but uncorrelated to the label's contents
+func (t *Tiler) getLabelColor(label string, bright bool) color.RGBA {
+	if color, exists := t.colors[label]; exists {
+		return color
+	}
 
-    my $rot_side = ( $side + $rotation ) % 4;
-    if ( $flip_horiz ) {
-        if ( $rot_side == LEFT ) {
-            $rot_side = RIGHT;
-        }
-        elsif ( $rot_side == RIGHT ) {
-            $rot_side = LEFT;
-        }
-    }
-    if ( $flip_vert ) {
-        if ( $rot_side == TOP ) {
-            $rot_side = BOTTOM;
-        }
-        elsif ( $rot_side == BOTTOM ) {
-            $rot_side = TOP;
-        }
-    }
+	// use a hash function to get some deterministic but random-looking data
+	// based on the label. here we get 32 bytes from MD5 and unpack the first
+	// 24 as uint64's.
+	var i1, i2, i3 uint64
+	hash := md5.Sum([]byte(label + t.ColorTweak))
+	buf := bytes.NewReader(hash[:])
+	binary.Read(buf, binary.LittleEndian, &i1)
+	binary.Read(buf, binary.LittleEndian, &i2)
+	binary.Read(buf, binary.LittleEndian, &i3)
 
-    for my $i ( 0 .. $bond_strength - 1 ) {
-        if ( $rot_side == TOP ) {
-            #$img->line(
-            #    0, $i * $tile_vert_shift, $tile_width - 1,
-            #    $i * $tile_vert_shift,
-            #    $color
-            #);
-            $img->filledRectangle(
-                0, $i * $tile_vert_shift - $bond_fudge_y,
-                $tile_width - 1, $i * $tile_vert_shift + $bond_fudge_y,
-                $color
-            );
-        }
-        elsif ( $rot_side == BOTTOM ) {
-            $img->filledRectangle(
-                0, $tile_height - 1 - $i * $tile_vert_shift - $bond_fudge_y,
-                $tile_width - 1, $tile_height - 1 - $i * $tile_vert_shift + $bond_fudge_y,
-                $color
-            );
-        }
-        elsif ( $rot_side == LEFT ) {
-            $img->filledRectangle(
-                $i * $tile_horiz_shift - $bond_fudge_x, 0,
-                $i * $tile_horiz_shift + $bond_fudge_x, $tile_height - 1,
-                $color
-            );
-        }
-        elsif ( $rot_side == RIGHT ) {
-            $img->filledRectangle(
-                $tile_width - 1 - $i * $tile_horiz_shift - $bond_fudge_x, 0,
-                $tile_width - 1 - $i * $tile_horiz_shift + $bond_fudge_x, $tile_height - 1,
-                $color
-            );
-        }
-    }
+	r1 := float64(i1) / float64(math.MaxUint64)
+	r2 := float64(i2) / float64(math.MaxUint64)
+	r3 := float64(i3) / float64(math.MaxUint64)
+
+	h, s, v := r1, 0.0, 0.0
+	if bright {
+		v = 0.9 + 0.1*r3
+		s = 0.0 + 0.02*r2
+	} else {
+		v = 0.1 + 0.4*r3
+		s = 0.5 + 0.5*r2
+	}
+
+	cp := math.Floor(h * 6)
+	cs := h - cp
+	ca := (1 - s) * v
+	cb := (1 - (s * cs)) * v
+	cc := (1 - (s * (1 - cs))) * v
+
+	var r, g, b float64
+	switch int(cp) {
+	case 0:
+		r, g, b = v, cc, ca
+	case 1:
+		r, g, b = cb, v, ca
+	case 2:
+		r, g, b = ca, v, cc
+	case 3:
+		r, g, b = ca, cb, v
+	case 4:
+		r, g, b = cc, ca, v
+	case 5:
+		r, g, b = v, ca, cb
+	}
+
+	r = 255 * math.Max(0, math.Min(1, r))
+	g = 255 * math.Max(0, math.Min(1, g))
+	b = 255 * math.Max(0, math.Min(1, b))
+
+	c := color.RGBA{R: uint8(r), G: uint8(g), B: uint8(b)}
+	if t.colors == nil {
+		t.colors = make(map[string]color.RGBA)
+	}
+	t.colors[label] = c
+	return c
 }
 
-sub drawString {
-    my $img = shift;
-    my $side = shift;
-    my $bond_strength = shift;
-    my $bond_shift = $bond_strength - 1;
-    my $string = shift;
-    my $color = shift;
+func (t *Tiler) drawBond(im draw.Image, side Direction, strength int, color color.RGBA) {
+	rotSide := Direction((int(side) + t.Rotation) % 4)
+	if t.FlipHorizontal {
+		if rotSide == Left {
+			rotSide = Right
+		} else if rotSide == Right {
+			rotSide = Left
+		}
+	}
+	if t.FlipVertical {
+		if rotSide == Up {
+			rotSide = Down
+		} else if rotSide == Down {
+			rotSide = Up
+		}
+	}
 
-    my ( $x, $y );
-
-    my $rot_side = ( $side + $rotation ) % 4;
-    if ( $flip_horiz ) {
-        if ( $rot_side == LEFT ) {
-            $rot_side = RIGHT;
-        }
-        elsif ( $rot_side == RIGHT ) {
-            $rot_side = LEFT;
-        }
-    }
-    if ( $flip_vert ) {
-        if ( $rot_side == TOP ) {
-            $rot_side = BOTTOM;
-        }
-        elsif ( $rot_side == BOTTOM ) {
-            $rot_side = TOP;
-        }
-    }
-
-    if ( $rot_side == TOP ) {
-        $y = $tile_vert_margin + $bond_shift * $tile_vert_shift;
-        $x = int( ( $tile_width - length( $string ) * $font_w ) / 2 );
-    }
-    elsif ( $rot_side == BOTTOM ) {
-        $y = $tile_height - $font_h - $tile_vert_margin - $bond_shift * $tile_vert_shift;
-        $x = int( ( $tile_width - length( $string ) * $font_w ) / 2 );
-    }
-    elsif ( $rot_side == LEFT ) {
-        $y = int( ( $tile_height - $font_h ) / 2 );
-        $x = $tile_horiz_margin + $bond_shift * $tile_horiz_shift;
-    }
-    elsif ( $rot_side == RIGHT ) {
-        $y = int( ( $tile_height - $font_h ) / 2 );
-        $x = $tile_width - $tile_horiz_margin - length( $string ) * $font_w - $bond_shift * $tile_horiz_shift;
-    }
-    $x -= $font_x;
-    $y -= $font_y;
-
-    #$img->string( $font, $x, $y, $string, $color );
-    $img->stringFT( $color, $ttf_font, $font_size, 0, $x, $y, $string );
+	for i := 0; i < strength; i++ {
+		var r image.Rectangle
+		switch rotSide {
+		case Up:
+			r = image.Rect(0, i*t.tileVertShift-t.bondFudgeY,
+				t.TileWidth-1, i*t.tileVertShift+t.bondFudgeY)
+		case Down:
+			r = image.Rect(0, t.TileHeight-1-i*t.tileVertShift-t.bondFudgeY,
+				t.TileWidth-1, t.TileHeight-1-i*t.tileVertShift+t.bondFudgeY)
+		case Left:
+			r = image.Rect(i*t.tileHorizShift-t.bondFudgeX, 0,
+				i*t.tileHorizShift+t.bondFudgeX, t.TileHeight-1)
+		case Right:
+			r = image.Rect(t.TileWidth-1-i*t.tileHorizShift-t.bondFudgeX, 0,
+				t.TileWidth-1-i*t.tileHorizShift+t.bondFudgeX, t.TileHeight-1)
+		}
+		draw.Draw(im, r, &image.Uniform{color}, image.ZP, draw.Src)
+	}
 }
 
-# rotate the @assembly matrix
+func (t *Tiler) drawString(im image.Image, side Direction, strength int, color color.RGBA, label string) {
+	/*
+
+	   bond_shift := bond_strength - 1
+
+	   my ( $x, $y );
+
+	   my $rot_side = ( $side + $rotation ) % 4;
+	   if ( $flip_horiz ) {
+	       if ( $rot_side == LEFT ) {
+	           $rot_side = RIGHT;
+	       }
+	       elsif ( $rot_side == RIGHT ) {
+	           $rot_side = LEFT;
+	       }
+	   }
+	   if ( $flip_vert ) {
+	       if ( $rot_side == TOP ) {
+	           $rot_side = BOTTOM;
+	       }
+	       elsif ( $rot_side == BOTTOM ) {
+	           $rot_side = TOP;
+	       }
+	   }
+
+	   if ( $rot_side == TOP ) {
+	       $y = t.tileVertMargin + t.bondShift * t.tileVertShift;
+	       $x = int( ( t.TileWidth - length( $string ) * $font_w ) / 2 );
+	   }
+	   elsif ( $rot_side == BOTTOM ) {
+	       $y = t.TileHeight - $font_h - t.tileVertMargin - t.bondShift * t.tileVertShift;
+	       $x = int( ( t.TileWidth - length( $string ) * $font_w ) / 2 );
+	   }
+	   elsif ( $rot_side == LEFT ) {
+	       $y = int( ( t.TileHeight - $font_h ) / 2 );
+	       $x = t.tileHorizMargin + t.bondShift * t.tileHorizShift;
+	   }
+	   elsif ( $rot_side == RIGHT ) {
+	       $y = int( ( t.TileHeight - $font_h ) / 2 );
+	       $x = t.TileWidth - t.tileHorizMargin - length( $string ) * $font_w - t.bondShift * t.tileHorizShift;
+	   }
+	   $x -= $font_x;
+	   $y -= $font_y;
+
+	   #$img->string( $font, $x, $y, $string, $color );
+	   $img->stringFT( $color, $ttf_font, $font_size, 0, $x, $y, $string );
+	*/
+}
+
+// rotate the @assembly matrix
+/*
 sub computeRotated {
     my $old_assembly = shift;
     my $size_x = shift;

@@ -7,11 +7,12 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 type Machine struct {
 	Name            string
-	Symbols         []string
+	Symbols         []rune
 	Transitions     []Transition
 	InitialState    string
 	InitialLocation int
@@ -33,7 +34,7 @@ var (
 	parserTransitionRx = regexp.MustCompile("^TRANSITION\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+([HhLlRr])\\s+(\\S+)(?:\\s+(\\S+))?")
 )
 
-func (t *Tiler) ParseMachine() {
+func (t *Tiler) ParseMachine() *Machine {
 	f, err := os.Open(t.MachineFile)
 	if err != nil {
 		log.Panicf("Couldn't open %s: %s", t.MachineFile, err)
@@ -51,7 +52,7 @@ func (t *Tiler) ParseMachine() {
 
 	m := Machine{
 		Name:            name,
-		Symbols:         make([]string, 0),
+		Symbols:         make([]rune, 0),
 		Transitions:     make([]Transition, 0),
 		InitialState:    "1",
 		InitialLocation: 0,
@@ -69,7 +70,8 @@ func (t *Tiler) ParseMachine() {
 		if c := parserNameRx.FindStringSubmatch(line); c != nil {
 			m.Name = c[1]
 		} else if c := parserSymbolRx.FindStringSubmatch(line); c != nil {
-			m.Symbols = append(m.Symbols, c[1])
+			r, _ := utf8.DecodeRune([]byte(c[1]))
+			m.Symbols = append(m.Symbols, r)
 		} else if c := parserStartRx.FindStringSubmatch(line); c != nil {
 			m.InitialState = c[1]
 		} else if c := parserOffsetRx.FindStringSubmatch(line); c != nil {
@@ -87,8 +89,8 @@ func (t *Tiler) ParseMachine() {
 					/x
 			*/
 			t := Transition{c[1], c[2], c[3], letterToDirection(c[4]), c[5], c[6]}
-			if t.Output != "" && !(t.Move == 'h' || t.Move == 'H') {
-				log.Panicf("Halting string given for non-halting transition: %q", line)
+			if t.Output != "" && t.Move != Halt {
+				log.Panicf("Halting string given for non-halting transition %v: %q", t.Move, line)
 			}
 			m.Transitions = append(m.Transitions, t)
 		} else {
@@ -103,7 +105,7 @@ func (t *Tiler) ParseMachine() {
 		log.Panicf("No transitions specified")
 	}
 	m.Symbols = append(m.Symbols, t.BoundarySymbol)
-	t.machine = m
+	return &m
 }
 
 func letterToDirection(letter string) Direction {
