@@ -3,9 +3,7 @@ package tiler
 import (
 	"fmt"
 	"image"
-	"image/color"
 	"log"
-	. "math"
 )
 
 type Options struct {
@@ -13,6 +11,7 @@ type Options struct {
 	MaxDepth                     int
 	IgnoreDepthFailure           bool
 	FontPath                     string
+	FontSize                     float64
 	Rotation                     int // 0 is best for portrait or web (top->down), 3 is best for landscape or monitors (left->right)
 	FlipHorizontal, FlipVertical bool
 	BoundarySymbol               rune
@@ -23,30 +22,21 @@ type Options struct {
 
 type Tiler struct {
 	Options
-
-	// computed options
-	fontSize,
-	bondFudgeX, bondFudgeY,
-	tileHorizShift, tileVertShift,
-	tileHorizMargin, tileVertMargin int
-
 	*Machine
+	drawer
 	tiles []Tile // the tile "pool": things the self-assembler can draw from
 
-	colors map[string]color.RGBA
+	tileIndexBottom               map[string]*Tile
+	tileIndexLeft, tileIndexRight map[twople]*Tile
+}
+
+type twople struct {
+	first, second string
 }
 
 func (o *Options) NewTiler() *Tiler {
-	t := Tiler{
-		Options:         *o,
-		bondFudgeX:      int(Floor(float64(o.TileWidth) / 80)),
-		bondFudgeY:      int(Floor(float64(o.TileHeight) / 80)),
-		fontSize:        int(Sqrt(float64(o.TileHeight*o.TileWidth)) / 4),
-		tileHorizShift:  int(float64(o.TileWidth) / 10),
-		tileVertShift:   int(float64(o.TileHeight) / 10),
-		tileHorizMargin: int(float64(o.TileWidth) / 20),
-		tileVertMargin:  int(float64(o.TileHeight) / 20),
-	}
+	t := Tiler{Options: *o}
+	t.setupDrawer()
 	t.Machine = t.ParseMachine()
 	t.GenerateTiles()
 	return &t
@@ -174,5 +164,20 @@ func (t *Tiler) GenerateTiles() {
 			},
 		}
 		t.tiles = append(t.tiles, left, right)
+	}
+
+	log.Println("Generating tile caches...")
+	t.tileIndexBottom = make(map[string]*Tile)
+	t.tileIndexLeft = make(map[twople]*Tile)
+	t.tileIndexRight = make(map[twople]*Tile)
+	for _, tile := range t.tiles {
+		t.tileIndexBottom[tile.Sides[Down].Label] = &tile
+		t.tileIndexLeft[twople{tile.Sides[Left].Label, tile.Sides[Down].Label}] = &tile
+		t.tileIndexRight[twople{tile.Sides[Right].Label, tile.Sides[Down].Label}] = &tile
+	}
+
+	log.Println("Drawing tile images...")
+	for _, tile := range t.tiles {
+		tile.Image = t.generateImage(&tile)
 	}
 }

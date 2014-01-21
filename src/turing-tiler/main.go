@@ -17,6 +17,7 @@ func main() {
 	flag.IntVar(&options.MaxDepth, "max-depth", 100, "maximum number of transitions")
 	flag.BoolVar(&options.IgnoreDepthFailure, "ignore-depth-failure", false, "proceed when MaxDepth is exceeded")
 	flag.StringVar(&options.FontPath, "font-path", "/usr/share/fonts/truetype/ttf-bitstream-vera/Vera.ttf", "path to a truetype font")
+	flag.Float64Var(&options.FontSize, "font-size", 12, "font size in points")
 	flag.IntVar(&options.Rotation, "rotation", 0, "rotation from 0-3")
 	flag.BoolVar(&options.FlipHorizontal, "flip-horizontal", false, "flip the output horizontally")
 	flag.BoolVar(&options.FlipVertical, "flip-vertical", false, "flip the output vertically")
@@ -34,5 +35,5 @@ func main() {
 
 	log.Printf("Processing %s, %v", options.MachineFile, options.Inputs)
 	tiler := options.NewTiler()
-	tiler.DrawImages()
+	tiler.Assemble()
 }
