@@ -108,22 +108,22 @@ main( int argc, char** argv )
     for ( steps1 = 0; !done; steps1++ ) {
         if ( tape->value ) {
             switch ( state ) {
-            case A: update( A, 1, LEFT ); break;
-            case B: update( B, 1, RIGHT ); break;
-            case C: update( D, 1, RIGHT ); break;
-            case D: update( E, 0, RIGHT ); break;
-            case E: update( C, 1, RIGHT ); break;
-            case F: update( H, 1, LEFT ); done = 1; break;
+            case A: update( E, 1, LEFT ); break;
+            case B: update( F, 1, RIGHT ); break;
+            case C: update( B, 0, RIGHT ); break;
+            case D: update( C, 0, LEFT ); break;
+            case E: update( D, 0, RIGHT ); break;
+            case F: update( C, 1, RIGHT ); break;
             }
         }
         else {
             switch ( state ) {
-            case A: update( B, 1, LEFT ); break;
+            case A: update( B, 1, RIGHT ); break;
             case B: update( C, 1, RIGHT ); break;
-            case C: update( F, 0, RIGHT ); break;
-            case D: update( A, 1, LEFT ); break;
-            case E: update( A, 0, LEFT ); break;
-            case F: update( E, 1, LEFT ); break;
+            case C: update( D, 1, LEFT ); break;
+            case D: update( E, 1, RIGHT ); break;
+            case E: update( A, 1, LEFT ); break;
+            case F: update( F, 1, LEFT ); done = 1; break;
             }
         }
         if ( ( steps1 & mask ) == mask )
